@@ -10,10 +10,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="message">
-        <h3 class="message silkscreen-bold">Hello from our brand new Ai Agent</h3>
-        <h4 class="name">~Aanya</h4>
+  <div class="content">
+    <div class="message glass">
+      <h3 class="message silkscreen-bold">Hello from our brand new Ai Agent</h3>
+      <h4 class="name">~Aanya</h4>
     </div>
-  <script src="/static/script.js"></script>
+    <div class="audio-in glass">
+      <h1>Echo Bot</h1>
+      <audio id="echo-audio" controls></audio>
+      <button id="record-button" class="start-recording" onclick="startRecording()">Start Recording</button>
+    </div>
+    <div class="model glass">
+      <textarea type="text" id="text-input" placeholder="Type something..." size="40" ></textarea>
+      <button onclick="generateAudio()">Generate Audio</button>
+      <audio id="audio-player" controls></audio>
+    </div>
+  </div>
 </body>
+<script src="/static/script.js"></script>
 </html>

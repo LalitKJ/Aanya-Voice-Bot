@@ -7,19 +7,18 @@ import requests
 import os
 
 # Load Murf API key from .env
-load_dotenv()
+load_dotenv(".env")
 MURF_API_KEY = os.getenv("MURF_API_KEY")
 
 app = FastAPI()
 
 # Mount frontend folder
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
-
+app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 
 @app.get("/")
 def serve_home():
-    return FileResponse("../frontend/index.html")
+    return FileResponse("frontend/index.html")
 
 
 
