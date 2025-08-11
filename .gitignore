@@ -146,3 +146,4 @@ Thumbs.db
 
 # Project specific
 test_db.db
+backend/uploads/*

@@ -10,22 +10,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="message glass">
+    <h3 class="message silkscreen-bold">Hello from our brand new Ai Agent</h3>
+    <h4 class="name">~Aanya</h4>
+  </div>
   <div class="content">
-    <div class="message glass">
-      <h3 class="message silkscreen-bold">Hello from our brand new Ai Agent</h3>
-      <h4 class="name">~Aanya</h4>
-    </div>
-    <div class="audio-in glass">
-      <h1>Echo Bot</h1>
-      <audio id="echo-audio" controls></audio>
-      <button id="record-button" class="start-recording" onclick="startRecording()">Start Recording</button>
-    </div>
-    <div class="model glass">
+    <div class="text-to-speech glass">
       <textarea type="text" id="text-input" placeholder="Type something..." size="40" ></textarea>
       <button onclick="generateAudio()">Generate Audio</button>
       <audio id="audio-player" controls></audio>
     </div>
+    <div class="voice-transcript glass">
+      <h1>Echo Bot</h1>
+      <div class="record-audio">
+        <audio id="echo-audio" controls></audio>
+        <div class="controls">
+          <button id="record-button" class="start-recording" onclick="startRecording()">Start Recording</button>
+          <p id="upload-status"></p>
+        </div>
+        <audio id="llm-output" controls></audio>
+      </div>
+    </div>
   </div>
 </body>
 <script src="/static/script.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/player.style/tailwind-audio/+esm"></script>
 </html>
