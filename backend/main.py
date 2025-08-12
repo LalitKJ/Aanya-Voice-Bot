@@ -67,9 +67,11 @@ class TextInput(BaseModel):
 async def generate_audio(input: TextInput):
     try:
         response = await text_to_murf_voice(input.text)
+        return response.json()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Text to speech conversion failed: {str(e)}")
-    return response.json()
+        import logging
+        logging.error(f"TTS error: {e}")
+        return await fallback_audio_response()
 
 
 # 3. Play back audio from the generated link (Day 3)
@@ -110,14 +112,13 @@ async def transcribe_file(file: UploadFile = File(...)):
 @app.post("/tts/echo")
 async def echo_tts(file: UploadFile = File(...)):
     try:
-        # 1. transcribe the audio using AssemblyAI
         transcript = await voice_to_text(file)
-        # 2. generate Murf voice from the transcript
         response = await text_to_murf_voice(transcript)
         return response.json()
-    # 3. handle errors
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"TTS API failed: {str(e)}")
+        import logging
+        logging.error(f"Echo TTS error: {e}")
+        return await fallback_audio_response()
 
 
 # 8. Accept text as input and return the response from the LLM API as response (Day 8)
@@ -128,47 +129,42 @@ async def llm_query(file: UploadFile = File(...)):
         transcript = await voice_to_text(file)
         transcript = transcript + " \nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
         aiResponse = ask_gemini(transcript)
-        res = aiResponse.text[:2999]  # Limit response to 3000 characters
+        res = aiResponse.text[:2999]
         response = await text_to_murf_voice(res)
         return response.json()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM query failed: {str(e)}")
+        import logging
+        logging.error(f"LLM query error: {e}")
+        return await fallback_audio_response()
 
 
 
 # 10. Chat history endpoint (Day 10)
 class ChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
+    role: str  # "User" or "Aanya"
     content: str
 
 @app.post("/agent/chat/{session_id}")
 async def agent_chat(session_id: str, file: UploadFile = File(...)):
-    # Get or create chat history for this session
     history: List[Dict] = chat_history_store.get(session_id, [])
     try:
-        # 1. Transcribe user audio
         transcript = await voice_to_text(file)
-        # 2. Append user message to history
-        history.append({"role": "user", "content": transcript})
-        # 3. Build prompt from history
+        history.append({"role": "User", "content": transcript})
         prompt = "\n".join([
-            ("User: " + msg["content"] if msg["role"] == "user" else "Assistant: " + msg["content"])
+            ("User: " + msg["content"] if msg["role"] == "User" else "Aanya: " + msg["content"])
             for msg in history
         ])
         prompt += "\nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
-        # 4. Get LLM response
         aiResponse = ask_gemini(prompt)
         res = aiResponse.text[:2999]
-        # 5. Append assistant response to history
-        history.append({"role": "assistant", "content": res})
-        # 6. Save updated history
+        history.append({"role": "Aanya", "content": res})
         chat_history_store[session_id] = history
-        # 7. Convert response to audio
         response = await text_to_murf_voice(res)
-        # 8. Return audio and chat history
         return {"audio": response.json(), "history": history}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent chat failed: {str(e)}")
+        import logging
+        logging.error(f"Agent chat error: {e}")
+        return await fallback_audio_response()
 # class QueryInput(BaseModel):
 #     text: str
 
@@ -218,4 +214,16 @@ def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash"):
         response = model.generate_content(prompt)
         return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini query failed: {str(e)}")
+        import logging
+        logging.error(f"Gemini query error: {e}")
+        raise
+# Fallback audio response helper
+async def fallback_audio_response():
+    fallback_text = "I'm having trouble connecting right now."
+    try:
+        response = await text_to_murf_voice(fallback_text)
+        return response.json()
+    except Exception as e:
+        import logging
+        logging.error(f"Fallback TTS error: {e}")
+        return JSONResponse(content={"error": "Unable to generate fallback audio."}, status_code=500)

@@ -1,16 +1,19 @@
-
 // --- Session ID Management ---
 function generateSessionId() {
-	return 'sess-' + Math.random().toString(36).substr(2, 9);
+	return "sess-" + Math.random().toString(36).substr(2, 9);
 }
 
 function getSessionId() {
 	const urlParams = new URLSearchParams(window.location.search);
-	let sessionId = urlParams.get('session_id');
+	let sessionId = urlParams.get("session_id");
 	if (!sessionId) {
 		sessionId = generateSessionId();
-		urlParams.set('session_id', sessionId);
-		window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+		urlParams.set("session_id", sessionId);
+		window.history.replaceState(
+			{},
+			"",
+			`${window.location.pathname}?${urlParams}`
+		);
 	}
 	return sessionId;
 }
@@ -20,7 +23,7 @@ const SESSION_ID = getSessionId();
 async function generateAudio() {
 	const text = document.getElementById("text-input").value;
 	if (!text) {
-		alert("Please enter some text.");
+		showErrorMessage("Please enter some text.");
 		return;
 	}
 
@@ -36,26 +39,40 @@ async function generateAudio() {
 		}),
 	});
 
-	if (!response.ok) {
-		const error = await response.json();
-		alert("Error: " + error.detail);
-		return;
+	try {
+		if (!response.ok) {
+			const error = await response.json();
+			showErrorMessage(error.detail || "Error generating audio.");
+			return;
+		}
+		const data = await response.json();
+		console.log("Murf response:", data);
+		const audioUrl = data.audioFile || data.audioUrl;
+		if (audioUrl) {
+			const audioPlayer = document.getElementById("audio-player");
+			audioPlayer.src = audioUrl;
+			audioPlayer.style.display = "block";
+			audioPlayer.play();
+		} else {
+			if (data.error) {
+				showErrorMessage(data.error);
+			} else {
+				showErrorMessage("Audio URL not found in response.");
+			}
+		}
+	} catch (err) {
+		showErrorMessage("Error generating audio: " + (err.message || err));
 	}
-
-	const data = await response.json();
-	console.log("Murf response:", data);
-
-	const audioUrl = data.audioFile;
-	console.log("File: ", audioUrl);
-
-	if (audioUrl) {
-		const audioPlayer = document.getElementById("audio-player");
-		audioPlayer.src = audioUrl;
-		audioPlayer.style.display = "block";
-		audioPlayer.play();
+// Show error message in UI
+function showErrorMessage(msg) {
+	const statusElement = document.getElementById("upload-status");
+	if (statusElement) {
+		statusElement.classList.add("error");
+		statusElement.innerText = "❌ " + msg;
 	} else {
-		alert("Audio URL not found in response.");
+		alert(msg);
 	}
+}
 }
 
 let mediaRecorder;
@@ -115,7 +132,7 @@ async function transcribeAudioFn(recordedBlob) {
 		const data = await transcribeAudio(recordedBlob);
 		document.getElementById("transcriptText").innerText = data.transcript;
 	} catch (error) {
-		alert("Error transcribing audio: " + error.message);
+		showErrorMessage("Error transcribing audio: " + error.message);
 		console.error("Transcription error:", error);
 	}
 }
@@ -129,7 +146,7 @@ async function synthesisAudio(recordedBlob) {
 		audioPlayer.style.display = "block";
 		audioPlayer.play();
 	} catch (error) {
-		alert("Error resynthesizing audio: " + error.message);
+		showErrorMessage("Error resynthesizing audio: " + error.message);
 		console.error("Resynthesis error:", error);
 	}
 }
@@ -142,26 +159,27 @@ async function llmVoiceQuery(audio) {
 			throw new Error("No audio provided for chat query.");
 		}
 		const data = await agentChatQuery(audio);
-		if (!data || !data.audio || !data.audio.audioFile) {
-			throw new Error("No audio URL found in chat response.");
+		const audioUrl = (data.audio && (data.audio.audioFile || data.audio.audioUrl)) || null;
+		if (audioUrl) {
+			const audioPlayer = document.getElementById("llm-output");
+			if (!audioPlayer) {
+				throw new Error("LLM output audio element not found.");
+			}
+			audioPlayer.src = audioUrl;
+			audioPlayer.style.display = "block";
+			audioPlayer.play();
+		} else {
+			if (data.error) {
+				showErrorMessage(data.error);
+			} else {
+				showErrorMessage("No audio URL found in chat response.");
+			}
 		}
-		const audioPlayer = document.getElementById("llm-output");
-		if (!audioPlayer) {
-			throw new Error("LLM output audio element not found.");
-		}
-		audioPlayer.src = data.audio.audioFile;
-		audioPlayer.style.display = "block";
-		audioPlayer.play();
-		// Display chat history (optional)
 		if (data.history) {
 			displayChatHistory(data.history);
 		}
-		// After audio finishes, auto-start recording next user message
-		audioPlayer.onended = () => {
-			startRecording();
-		};
 	} catch (err) {
-		alert("Error playing chat output: " + (err.message || err));
+		showErrorMessage("Error playing chat output: " + (err.message || err));
 		console.error("Chat output error:", err);
 	}
 }
@@ -190,7 +208,12 @@ async function agentChatQuery(audio) {
 function displayChatHistory(history) {
 	const chatDiv = document.getElementById("chat-history");
 	if (!chatDiv) return;
-	chatDiv.innerHTML = history.map(msg => `<div class="${msg.role}"><b>${msg.role}:</b> ${msg.content}</div>`).join("");
+	chatDiv.innerHTML = history
+		.map(
+			(msg) =>
+				`<div class="${msg.role}"><b>${msg.role}:</b> ${msg.content}</div>`
+		)
+		.join("");
 }
 
 // // Helper functions //
