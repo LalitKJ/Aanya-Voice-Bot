@@ -1,3 +1,17 @@
+/* Custom error message styling */
+.error-message {
+  display: none;
+  background: #ffe6e6;
+  color: #b30000;
+  border: 1px solid #ffb3b3;
+  border-radius: 8px;
+  padding: 0.75em 1em;
+  margin: 0.5em 0 0.5em 0;
+  font-size: 1.1em;
+  font-family: 'Silkscreen', monospace;
+  box-shadow: 0 2px 8px rgba(255,0,0,0.08);
+  transition: opacity 0.3s;
+}
 * {
     padding: 0;
     margin: 0;

@@ -7,6 +7,7 @@ from io import BytesIO
 from typing import List, Dict
 import requests
 import os
+import logging
 from pathlib import Path
 import assemblyai as aai
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,7 +70,6 @@ async def generate_audio(input: TextInput):
         response = await text_to_murf_voice(input.text)
         return response.json()
     except Exception as e:
-        import logging
         logging.error(f"TTS error: {e}")
         return await fallback_audio_response()
 
@@ -116,7 +116,6 @@ async def echo_tts(file: UploadFile = File(...)):
         response = await text_to_murf_voice(transcript)
         return response.json()
     except Exception as e:
-        import logging
         logging.error(f"Echo TTS error: {e}")
         return await fallback_audio_response()
 
@@ -133,7 +132,6 @@ async def llm_query(file: UploadFile = File(...)):
         response = await text_to_murf_voice(res)
         return response.json()
     except Exception as e:
-        import logging
         logging.error(f"LLM query error: {e}")
         return await fallback_audio_response()
 
@@ -162,7 +160,6 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
         response = await text_to_murf_voice(res)
         return {"audio": response.json(), "history": history}
     except Exception as e:
-        import logging
         logging.error(f"Agent chat error: {e}")
         return await fallback_audio_response()
 # class QueryInput(BaseModel):
@@ -214,7 +211,6 @@ def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash"):
         response = model.generate_content(prompt)
         return response
     except Exception as e:
-        import logging
         logging.error(f"Gemini query error: {e}")
         raise
 # Fallback audio response helper
@@ -224,6 +220,5 @@ async def fallback_audio_response():
         response = await text_to_murf_voice(fallback_text)
         return response.json()
     except Exception as e:
-        import logging
         logging.error(f"Fallback TTS error: {e}")
         return JSONResponse(content={"error": "Unable to generate fallback audio."}, status_code=500)

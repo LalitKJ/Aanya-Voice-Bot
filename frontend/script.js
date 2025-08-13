@@ -63,16 +63,23 @@ async function generateAudio() {
 	} catch (err) {
 		showErrorMessage("Error generating audio: " + (err.message || err));
 	}
-// Show error message in UI
-function showErrorMessage(msg) {
-	const statusElement = document.getElementById("upload-status");
-	if (statusElement) {
-		statusElement.classList.add("error");
-		statusElement.innerText = "❌ " + msg;
-	} else {
-		alert(msg);
+	// Show error message in UI
+	function showErrorMessage(msg) {
+		const errorDiv = document.getElementById("error-message");
+		if (errorDiv) {
+			errorDiv.innerHTML = `<span style='font-size:1.3em;'>❌</span> <span>${msg}</span>`;
+			errorDiv.style.display = "block";
+			errorDiv.style.opacity = 1;
+			setTimeout(() => {
+				errorDiv.style.opacity = 0.7;
+			}, 2000);
+			setTimeout(() => {
+				errorDiv.style.display = "none";
+			}, 6000);
+		} else {
+			alert(msg);
+		}
 	}
-}
 }
 
 let mediaRecorder;
@@ -159,7 +166,9 @@ async function llmVoiceQuery(audio) {
 			throw new Error("No audio provided for chat query.");
 		}
 		const data = await agentChatQuery(audio);
-		const audioUrl = (data.audio && (data.audio.audioFile || data.audio.audioUrl)) || null;
+		const audioUrl =
+			(data.audio && (data.audio.audioFile || data.audio.audioUrl)) ||
+			null;
 		if (audioUrl) {
 			const audioPlayer = document.getElementById("llm-output");
 			if (!audioPlayer) {
