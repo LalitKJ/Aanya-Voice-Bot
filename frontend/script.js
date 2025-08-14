@@ -220,9 +220,26 @@ function displayChatHistory(history) {
 	chatDiv.innerHTML = history
 		.map(
 			(msg) =>
-				`<div class="${msg.role}"><b>${msg.role}:</b> ${msg.content}</div>`
+				`<div class="chat-msg ${msg.role}"><span class="chat-role">${msg.role}:</span> <span class="chat-content">${msg.content}</span></div>`
 		)
 		.join("");
+	// Show error message in UI
+	function showErrorMessage(msg) {
+		const errorDiv = document.getElementById("error-message");
+		if (errorDiv) {
+			errorDiv.innerHTML = `<span style='font-size:1.3em;'>❌</span> <span>${msg}</span>`;
+			errorDiv.style.display = "block";
+			errorDiv.style.opacity = 1;
+			setTimeout(() => {
+				errorDiv.style.opacity = 0.7;
+			}, 2000);
+			setTimeout(() => {
+				errorDiv.style.display = "none";
+			}, 6000);
+		} else {
+			alert(msg);
+		}
+	}
 }
 
 // // Helper functions //

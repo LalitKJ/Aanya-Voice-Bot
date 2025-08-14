@@ -1,3 +1,50 @@
+/* Agent UI revamp */
+.agent-ui {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+.agent-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1em;
+}
+.record-btn {
+  background: linear-gradient(90deg, #ff4b2b 0%, #ff416c 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 1em 2.5em;
+  font-size: 1.3em;
+  font-family: 'Silkscreen', monospace;
+  box-shadow: 0 4px 16px rgba(255,65,108,0.15);
+  cursor: pointer;
+  outline: none;
+  transition: background 0.3s, transform 0.2s;
+  position: relative;
+  margin-bottom: 0.5em;
+}
+.record-btn.recording {
+  background: linear-gradient(90deg, #ff416c 0%, #ff4b2b 100%);
+  transform: scale(1.08);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,65,108,0.3); }
+  70% { box-shadow: 0 0 0 10px rgba(255,65,108,0.05); }
+  100% { box-shadow: 0 0 0 0 rgba(255,65,108,0.3); }
+}
+.mic-icon {
+  font-size: 1.5em;
+  margin-right: 0.5em;
+  vertical-align: middle;
+}
+.record-btn:active {
+  transform: scale(0.98);
+}
 /* Custom error message styling */
 .error-message {
   display: none;
@@ -43,7 +90,7 @@ div.content {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  width: 100%;
+  width: 100dvw;
 }
 
 
@@ -79,6 +126,8 @@ div.text-to-speech {
 div.voice-transcript {
   padding: 30px 30px;
   height: min-content;
+  width: 60%;
+  margin-inline: auto;
   h1 {
     font-size: 2rem;
     margin-bottom: 30px;
