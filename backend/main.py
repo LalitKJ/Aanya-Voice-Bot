@@ -2,32 +2,18 @@ from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from dotenv import load_dotenv
-from io import BytesIO
 from typing import List, Dict
-import requests
-import os
 import logging
 from pathlib import Path
-import assemblyai as aai
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
-import google.generativeai as genai
-# from google import generativeai as genai
-import aiofiles
+
+# Importing services
+from services.stt_service import speech_to_text
+from services.tts_service import text_to_murf_voice, list_voices, fallback_audio_response
+from services.llm_service import ask_gemini
 
 # Global in-memory chat history store
 chat_history_store = {}
 
-# Load Murf API key from .env
-load_dotenv("../.env")
-MURF_API_KEY = os.getenv("MURF_API_KEY")
-ASSEMBLY_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
-GEMENAI_API_KEY = os.getenv("GEMENAI_API_KEY")
-
-# Api key setups
-aai.settings.api_key = ASSEMBLY_API_KEY
-genai.configure(api_key=GEMENAI_API_KEY) # type: ignore
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -51,14 +37,13 @@ def say_hello():
 
 # 2. Generate voice from text using Murf API and send audio link (Day 2)
 @app.get("/voices")
-def list_voices():
-    url = "https://api.murf.ai/v1/speech/voices"
-    headers = {
-        "accept": "application/json",
-        "api-key": MURF_API_KEY
-    }
-    res = requests.get(url, headers=headers)
-    return res.json()
+async def get_voices():
+    try:
+        res = await list_voices()
+        return res.json()
+    except Exception as e:
+        logging.error(f"Error fetching voices: {e}")
+        return JSONResponse(content={"error": "Unable to fetch voices."}, status_code=500)
 
 class TextInput(BaseModel):
     text: str
@@ -102,7 +87,7 @@ async def upload_audio(file: UploadFile = File(...)):
 async def transcribe_file(file: UploadFile = File(...)):
     try:
         # 1. transcribe the audio using AssemblyAI
-        transcript = await voice_to_text(file)
+        transcript = await speech_to_text(file)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
     return {"transcript": transcript}
@@ -112,7 +97,7 @@ async def transcribe_file(file: UploadFile = File(...)):
 @app.post("/tts/echo")
 async def echo_tts(file: UploadFile = File(...)):
     try:
-        transcript = await voice_to_text(file)
+        transcript = await speech_to_text(file)
         response = await text_to_murf_voice(transcript)
         return response.json()
     except Exception as e:
@@ -125,7 +110,7 @@ async def echo_tts(file: UploadFile = File(...)):
 @app.post("/llm/query")
 async def llm_query(file: UploadFile = File(...)):
     try:
-        transcript = await voice_to_text(file)
+        transcript = await speech_to_text(file)
         transcript = transcript + " \nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
         aiResponse = ask_gemini(transcript)
         res = aiResponse.text[:2999]
@@ -146,7 +131,7 @@ class ChatMessage(BaseModel):
 async def agent_chat(session_id: str, file: UploadFile = File(...)):
     history: List[Dict] = chat_history_store.get(session_id, [])
     try:
-        transcript = await voice_to_text(file)
+        transcript = await speech_to_text(file)
         history.append({"role": "User", "content": transcript})
         prompt = "\n".join([
             ("User: " + msg["content"] if msg["role"] == "User" else "Aanya: " + msg["content"])
@@ -165,60 +150,3 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 # class QueryInput(BaseModel):
 #     text: str
 
-
-
-# # # Helper function # # #
-# 1. Text to Murf voice
-async def text_to_murf_voice(text: str, voice_id: str = "en-IN-alia", format: str = "mp3"):
-    url = "https://api.murf.ai/v1/speech/generate"
-    payload = {
-        "text": text,
-        "voiceId": "en-IN-alia",
-        "format": "mp3"
-    }
-    async with httpx.AsyncClient() as client:
-        res = await client.post(
-            url,
-            headers={
-                "accept": "application/json",
-                "content-type": "application/json",
-                "api-key": MURF_API_KEY if MURF_API_KEY is not None else "",
-            },
-            json=payload
-        )
-    return res
-
-# 2. Voice to text
-async def voice_to_text(file: UploadFile):
-    if not file:
-        raise HTTPException(status_code=400, detail="No file provided for transcription.")
-    audio_bytes = await file.read()
-    if not audio_bytes:
-        raise HTTPException(status_code=400, detail="No audio data in uploaded file.")
-    transcriber = aai.Transcriber()
-    try:
-        transcript = transcriber.transcribe(BytesIO(audio_bytes))
-        return (transcript.text if transcript and transcript.text else "I couldn't understand that. Please try again.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-
-#3. Ask Gemini ai
-def ask_gemini(prompt: str, model_name: str = "gemini-2.5-flash"):
-    if not prompt:
-        raise HTTPException(status_code=400, detail="No prompt provided for Ai query.")
-    try:
-        model = genai.GenerativeModel(model_name) # type: ignore
-        response = model.generate_content(prompt)
-        return response
-    except Exception as e:
-        logging.error(f"Gemini query error: {e}")
-        raise
-# Fallback audio response helper
-async def fallback_audio_response():
-    fallback_text = "I'm having trouble connecting right now."
-    try:
-        response = await text_to_murf_voice(fallback_text)
-        return response.json()
-    except Exception as e:
-        logging.error(f"Fallback TTS error: {e}")
-        return JSONResponse(content={"error": "Unable to generate fallback audio."}, status_code=500)
