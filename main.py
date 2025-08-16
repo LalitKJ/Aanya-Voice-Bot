@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict
 import logging
 from pathlib import Path
+import uvicorn
 
 # Importing services
 from services.stt_service import speech_to_text
@@ -14,21 +15,24 @@ from services.llm_service import ask_gemini
 # Global in-memory chat history store
 chat_history_store = {}
 
+def main():
+    print("Hello from backend!")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # Initialize FastAPI app
 app = FastAPI()
-
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Mount frontend folder (relative to backend directory)
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+app.mount("/static", StaticFiles(directory="./frontend"), name="static")
 
 
 # 1. Serve the index.html file (Day 1)
 @app.get("/")
 def serve_home():
-    return FileResponse("../frontend/index.html")
+    return FileResponse("./frontend/index.html")
+
 
 @app.get("/api/hello")
 def say_hello():
@@ -150,3 +154,9 @@ async def agent_chat(session_id: str, file: UploadFile = File(...)):
 # class QueryInput(BaseModel):
 #     text: str
 
+
+
+
+
+if __name__ == "__main__":
+    main()
