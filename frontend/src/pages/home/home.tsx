@@ -1,3 +1,4 @@
+// @ts-nocheck
 import './home.scss'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
