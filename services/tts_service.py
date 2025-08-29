@@ -4,15 +4,21 @@ from dotenv import load_dotenv
 import logging
 import os
 import asyncio
+from pathlib import Path
 import websockets
+from murf import Murf
 import json
-
-load_dotenv("../../.env")
-MURF_API_KEY = os.getenv("MURF_API_KEY")
+from core.config import MURF_API_KEY
 
 MURF_WS_URL = "wss://api.murf.ai/v1/speech/stream-input"
 
 STATIC_CONTEXT_ID = "aanya-demo-session"
+
+# Ensure uploads folder exists
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+default_voice = "en-IN-alia"
 
 async def text_to_murf_voice(text: str, voice_id: str = "en-IN-alia", format: str = "mp3"):
     url = "https://api.murf.ai/v1/speech/generate"
@@ -74,6 +80,29 @@ async def stream_murf_voice(text: str, voice_id: str = "en-IN-alia", format: str
             if response.get("status") == "done":
                 print("Streaming complete.")
                 break
+
+
+def speak(text: str, voice_id: str = default_voice, output_file: str = "stream_output.wav"):
+    client = Murf(api_key=MURF_API_KEY)
+
+    file_path = UPLOADS_DIR / output_file
+
+    # Start with a clean file
+    open(file_path, "wb").close()
+
+    res = client.text_to_speech.stream(
+        text=text,
+        voice_id=voice_id,
+        style="Conversational"
+    )
+
+    audio_bytes = b""
+    for audio_chunk in res:
+        audio_bytes += audio_chunk
+        with open(file_path, "ab") as f:
+            f.write(audio_chunk)
+
+    return audio_bytes
 
 
 async def list_voices():

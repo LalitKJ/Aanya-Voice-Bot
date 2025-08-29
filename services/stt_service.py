@@ -36,60 +36,74 @@ async def speech_to_text(file: UploadFile):
 
 
 
-class AssemblyAIStreamingClient:
-    def __init__(self, sample_rate=16000):
-        self.transcription_queue = asyncio.Queue()
+
+
+
+class AssemblyAIStreamingTranscriber:
+    """
+    Wrapper around AAI StreamingClient that exposes:
+        - on_partial_callback(text) for interim results
+        - on_final_callback(text)   when end_of_turn=True
+    """
+    def __init__(
+        self,
+        sample_rate: int = 16000,
+        on_partial_callback=None,
+        on_final_callback=None,
+    ):
+        self.on_partial_callback = on_partial_callback
+        self.on_final_callback = on_final_callback
+
         self.client = StreamingClient(
             StreamingClientOptions(
                 api_key=aai.settings.api_key,
-                api_host="streaming.assemblyai.com"
+                api_host="streaming.assemblyai.com",
             )
         )
-        # Bind handlers, passing ONLY event to your method
-        self.client.on(StreamingEvents.Begin, lambda client, event: self.on_begin(event))
-        self.client.on(StreamingEvents.Turn, lambda client, event: self.on_turn(event))
-        self.client.on(StreamingEvents.Termination, lambda client, event: self.on_terminated(event))
-        self.client.on(StreamingEvents.Error, lambda client, error: self.on_error(error))
-        self.client.connect(StreamingParameters(
-            sample_rate=sample_rate, format_turns=False
-        ))
 
-    def on_begin(self, event):
-        print(f"🐍 File: services/stt_service.py | Line: 58 | __init__ ~ Transcription Session started: {event.id}")
-        logging.info(f"Transcription Session started: {event.id}")
+        # register events
+        self.client.on(StreamingEvents.Begin, lambda client, event: self._on_begin(event))
+        self.client.on(StreamingEvents.Turn, lambda client, event: self._on_turn(client, event))
+        self.client.on(StreamingEvents.Error, lambda client, error: self._on_error(error))
+        self.client.on(StreamingEvents.Termination, lambda client, event: self._on_termination(event))
 
-    def on_turn(self, event):
-        transcript_text = event.transcript
-        logging.info(f"Real-time transcript: {transcript_text}")
-        # print("🐍 File: services/stt_service.py | Line: 63 | on_turn ~ transcript_text",transcript_text)
-        try:
-            self.transcription_queue.put_nowait({
-                "type": "transcription",
-                "text": transcript_text,
-                "is_final": event.end_of_turn
-            })
-        except asyncio.QueueFull:
-            logging.warning("Transcription queue is full")
+        self.client.connect(
+            StreamingParameters(
+                sample_rate=sample_rate,
+                format_turns=False,
+            )
+        )
 
-        if event.end_of_turn and not event.turn_is_formatted:
-            params = StreamingParameters(sample_rate=16000, format_turns=True)
-            self.client.set_params(params)
+    def _on_begin(self, event: BeginEvent):
+        logging.info(f"AAI session started: {event.id}")
 
-    def on_terminated(self, event):
-        print(f"Transcription Session terminated: {event.audio_duration_seconds} seconds processed")
+    def _on_turn(self, client: StreamingClient, event: TurnEvent):
+        text = (event.transcript or "").strip()
+        if not text:
+            return
 
-    def on_error(self, error):
-        logging.error(f"AssemblyAI streaming error: {error}")
-        try:
-            self.transcription_queue.put_nowait({
-                "type": "error",
-                "message": f"Transcription error: {error}"
-            })
-        except asyncio.QueueFull:
-            logging.warning("Transcription queue is full")
+        if event.end_of_turn:
+            if self.on_final_callback:
+                self.on_final_callback(text)
 
-    def stream(self, audio_chunk: bytes):
+            if not event.turn_is_formatted:
+                try:
+                    client.set_params(StreamingSessionParameters(format_turns=True))
+                except Exception as set_err:
+                    print("set_params error:", set_err)
+        else:
+            if self.on_partial_callback:
+                self.on_partial_callback(text)
+    
+    def _on_error(self, error: StreamingError):
+        print("AAI error:", error)
+    
+    def _on_termination(self, event: TerminationEvent):
+        print(f"AAI session terminated after {event.audio_duration_seconds} s")
+
+    def stream_audio(self, audio_chunk: bytes):
         self.client.stream(audio_chunk)
 
     def close(self):
         self.client.disconnect(terminate=True)
+

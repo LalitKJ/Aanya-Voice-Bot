@@ -9,15 +9,17 @@ import uvicorn
 import json
 import asyncio
 import datetime
+import base64
 
 # Importing services
-from services.stt_service import speech_to_text
-from services.tts_service import text_to_murf_voice, list_voices, fallback_audio_response, stream_murf_voice
-from services.llm_service import ask_gemini, stream_llm_response
-from services.stt_service import AssemblyAIStreamingClient
+import services.llm_service as llm
+import services.tts_service as tts
+import services.stt_service as stt
+import services.persona as persona
 
 # Global in-memory chat history store
-chat_history_store = {}
+# chat_history_store = {}
+chat_history_store: Dict[str, List[Dict]] = {}
 
 def main():
     print("Hello from backend!")
@@ -38,134 +40,46 @@ def serve_home():
     return {"message": "Hello from Backend!"}
 
 
-@app.get("/hello")
-def say_hello():
-    return {"message": "Hello from FastAPI!"}
-
 
 # 2. Generate voice from text using Murf API and send audio link (Day 2)
 @app.get("/voices")
 async def get_voices():
     try:
-        res = await list_voices()
+        res = await tts.list_voices()
         return res.json()
     except Exception as e:
         logging.error(f"Error fetching voices: {e}")
         return JSONResponse(content={"error": "Unable to fetch voices."}, status_code=500)
 
-class TextInput(BaseModel):
-    text: str
-    voiceId: str = "en-IN-alia"
-    format: str = "mp3"
-@app.post("/generate-audio")
-async def generate_audio(input: TextInput):
-    try:
-        response = await text_to_murf_voice(input.text)
-        return response.json()
-    except Exception as e:
-        logging.error(f"TTS error: {e}")
-        return await fallback_audio_response()
-
-
-# 3. Play back audio from the generated link (Day 3)
-# 4. Record your voice and play it back to you (Day 4)
-# 5. Upload audio file (Day 5)
-@app.post("/upload-audio")
-async def upload_audio(file: UploadFile = File(...)):
-    print("Request recieved for file upload")
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided for uploaded file.")
-    try:
-        file_location = UPLOAD_DIR / file.filename
-        content = await file.read()
-        with open(file_location, "wb") as f:
-            f.write(content)
-        return {
-            "filename": file.filename,
-            "content_type": file.content_type,
-            "size": len(content)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-
-
-
-# 6. Transcribing the audio data, and returning the transcription as response using AssemblyAI (Day 6)
-@app.post("/transcribe/file")
-async def transcribe_file(file: UploadFile = File(...)):
-    try:
-        # 1. transcribe the audio using AssemblyAI
-        transcript = await speech_to_text(file)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-    return {"transcript": transcript}
-
-
-# 7. Update your echo bot to repeat back what you said, in a murf voice. (Day 7)
-@app.post("/tts/echo")
-async def echo_tts(file: UploadFile = File(...)):
-    try:
-        transcript = await speech_to_text(file)
-        response = await text_to_murf_voice(transcript)
-        return response.json()
-    except Exception as e:
-        logging.error(f"Echo TTS error: {e}")
-        return await fallback_audio_response()
-
-
-# 8. Accept text as input and return the response from the LLM API as response (Day 8)
-# 9. Update your /llm/query endpoint to accept audio as input and return the response from the LLM API converted into audio using murf (Day 9)
-@app.post("/llm/query")
-async def llm_query(file: UploadFile = File(...)):
-    try:
-        transcript = await speech_to_text(file)
-        transcript = transcript + " \nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
-        aiResponse = ask_gemini(transcript)
-        res = aiResponse.text[:2999]
-        response = await text_to_murf_voice(res)
-        return response.json()
-    except Exception as e:
-        logging.error(f"LLM query error: {e}")
-        return await fallback_audio_response()
-
-
-
-# 10. Chat history endpoint (Day 10)
-class ChatMessage(BaseModel):
-    role: str  # "User" or "Aanya"
-    content: str
-
-@app.post("/agent/chat/{session_id}")
-async def agent_chat(session_id: str, file: UploadFile = File(...)):
     history: List[Dict] = chat_history_store.get(session_id, [])
     try:
-        transcript = await speech_to_text(file)
+        transcript = await stt.speech_to_text(file)
         history.append({"role": "User", "content": transcript})
         prompt = "\n".join([
             ("User: " + msg["content"] if msg["role"] == "User" else "Aanya: " + msg["content"])
             for msg in history
         ])
         prompt += "\nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
-        aiResponse = ask_gemini(prompt)
+        aiResponse = llm.ask_gemini(prompt)
         res = aiResponse.text[:2999]
         history.append({"role": "Aanya", "content": res})
         chat_history_store[session_id] = history
-        response = await text_to_murf_voice(res)
+        response = await tts.text_to_murf_voice(res)
         return {"audio": response.json(), "history": history}
     except Exception as e:
         logging.error(f"Agent chat error: {e}")
-        return await fallback_audio_response()
+        return await tts.fallback_audio_response()
 
 
-# 15. Websocket endpoint for real-time communication (Day 15)
+# 3. Websocket endpoint for real-time communication (Day 15)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     try:
         if websocket is None:
             raise ValueError("WebSocket cannot be None")
         await websocket.accept()
-        # msg = await stream_murf_voice("Hello, this is a test message from the WebSocket endpoint.", "en-IN-alia", "mp3")
-        # async for audio_chunk in stream_murf_voice("Hello, this is a test message from the WebSocket endpoint.", "en-IN-alia", "mp3"):
+        # msg = await llm.stream_murf_voice("Hello, this is a test message from the WebSocket endpoint.", "en-IN-alia", "mp3")
+        # async for audio_chunk in llm.stream_murf_voice("Hello, this is a test message from the WebSocket endpoint.", "en-IN-alia", "mp3"):
         #     await websocket.send_json({"audio_base64": audio_chunk})
         #     print("Audio chunk length:", len(audio_chunk))
         while True:
@@ -178,93 +92,81 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logging.error(f"WebSocket error: {e}")
 
-# 17. Websocket endpoint for real-time communication (Day 16)
+
+# 4. Websocket endpoint for real-time communication (Day 16)
+async def llm_tts_pipeline(session_id: str, text: str, websocket: WebSocket):
+    tts_queue = asyncio.Queue()
+    # Append user message to chat history
+    history = chat_history_store.get(session_id, [])
+    history.append({"role": "User", "content": text})
+    persona_data = persona.build_persona(history, persona.PersonaType.PIRATE)
+
+    # Task to stream LLM text and push it to the TTS queue
+    async def llm_worker():
+        try:
+            # Construct prompt with chat history for Gemini LLM
+
+            # Query Gemini LLM with streaming (v2 for chunked response)
+            full_response = ""
+            async for chunk in llm.stream_llm_response_v2(persona_data["prompt"]):
+                if chunk:
+                    await tts_queue.put(chunk)
+                    full_response  += chunk
+            # After LLM response complete, store it in chat history
+            print("Full LLM response:", full_response)
+            await websocket.send_json({"type": "llm", "text": full_response})
+            history.append({"role": "Aanya", "content": full_response})
+            chat_history_store[session_id] = history
+        finally:
+            await tts_queue.put(None)  # Signal that LLM is done
+    # Task to get text from queue and synthesize audio
+    async def tts_worker():
+        while True:
+            chunk = await tts_queue.get()
+            if chunk is None:
+                break
+            try:
+                audio_bytes = tts.speak(chunk, persona_data["voiceId"])
+                if audio_bytes:
+                    b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+                    await websocket.send_json({"type": "audio", "b64": b64_audio})
+            except Exception as e:
+                logging.error(f"TTS Error: {e}")
+            finally:
+                tts_queue.task_done()
+    # Start and manage tasks
+    await asyncio.gather(
+        asyncio.create_task(llm_worker()),
+        asyncio.create_task(tts_worker())
+    )
+
 @app.websocket("/ws/audio")
 async def websocket_audio_endpoint(websocket: WebSocket):
-    if websocket is None:
-        raise ValueError("WebSocket cannot be None")
+    """Handles WebSocket connection for real-time transcription and voice response."""
     await websocket.accept()
-
-    UPLOADS_DIR = Path("uploads")
-    UPLOADS_DIR.mkdir(exist_ok=True)
-    # Create a unique file path for the streamed audio
-    file_path = UPLOADS_DIR / f"streamed_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.pcm"
-
-    # Initialize AssemblyAI client
+    logging.info("WebSocket client connected.")
+    # Get the current asyncio event loop
+    loop = asyncio.get_event_loop()
+    session_id = "default_session"
+    # Callback function for when final transcription is received
+    def on_final_transcript(text: str):
+        print(f"Query: {text}")
+        # Use run_coroutine_threadsafe to schedule the coroutine from the callback thread
+        asyncio.run_coroutine_threadsafe(
+            llm_tts_pipeline(session_id, text, websocket), loop
+        )
+    
+    # Initialize the streaming transcriber
+    transcriber = stt.AssemblyAIStreamingTranscriber(on_final_callback=on_final_transcript)
     try:
-        aaiClient = AssemblyAIStreamingClient()
-    except Exception as e:
-        logging.error(f"AssemblyAI client initialization error: {e}")
-        await websocket.send_json({"type": "error", "message": "Failed to initialize AssemblyAI client."})
-        await websocket.close(code=1006, reason="Internal Server Error")
-        return
-
-    async def send_transcriptions():
         while True:
-            try:
-                message = await aaiClient.transcription_queue.get()
-                print("Received message from transcription queue:", message)
-                if message is None:
-                    logging.error("Received null message from transcription queue")
-                    continue
-                if message["type"] == "transcription" and message["is_final"]:
-                    await websocket.send_json({
-                        "type": "turn_end",
-                        "transcript": message["text"]
-                    })
-                    print("Final transcript sent:", message["text"])
-                    # Get LLM response and send back
-                    msg = await stream_llm_response(message["text"])
-                    print("LLM response:", msg)
-                    async for audio_chunk in stream_murf_voice(msg, "mp3"):
-                        await websocket.send_json({"audio_base64": audio_chunk})
-                    print("🐍 File: Aanya-Voice-Bot/main.py | Line: 221 | Audio streaming complete.")
-                elif message["type"] == "error":
-                    await websocket.send_json({"type": "error", "message": message["message"]})
-                aaiClient.transcription_queue.task_done()
-            except asyncio.CancelledError:
-                print("Transcription sender task cancelled")
-                break
-            except Exception as e:
-                print("🐍 File: Aanya-Voice-Bot/main.py | Line: 226 | undefined ~ e\nError:",e)
-                logging.error(f"Error sending transcription: {e}")
-                break
-
-    # Start the transcription sender task
-    sender_task = asyncio.create_task(send_transcriptions())
-
-    try:
-        await websocket.send_json({
-            "type": "status",
-            "message": "Connected to transcription service"
-        })
-
-        with open(file_path, "wb") as f:
-            while True:
-                try:
-                    pcm_data = await websocket.receive_bytes()
-                except WebSocketDisconnect:
-                    print("WebSocket disconnected")
-                    break
-
-                if not pcm_data:
-                    continue
-                aaiClient.stream(pcm_data)
+            data = await websocket.receive_bytes()
+            transcriber.stream_audio(data)
+    except Exception as e:
+        logging.info(f"WebSocket connection closed: {e}")
     finally:
-        # Ensure the transcription sender task is cancelled and resources are cleaned up
-        sender_task.cancel()
-        try:
-            await sender_task
-        except asyncio.CancelledError:
-            pass
-        # Close AssemblyAI client
-        aaiClient.close()
-        print("AssemblyAI client disconnected")
-        # Close WebSocket connection
-        try:
-            await websocket.close(code=1000, reason="Normal Closure")
-        except Exception as e:
-            logging.error(f"Error closing WebSocket: {e}")
+        transcriber.close()
+        logging.info("Transcription resources released.")
 
 
 

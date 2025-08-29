@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 import logging
 import google.generativeai as genai
+from google.generativeai import types
 
 from dotenv import load_dotenv
 import os
@@ -40,3 +41,21 @@ async def stream_llm_response(prompt: str, model_name: str = "gemini-2.5-flash")
     except Exception as e:
         logging.error(f"Gemini streaming query error: {e}")
         raise  
+
+async def stream_llm_response_v2(prompt: str):
+    client = genai.GenerativeModel('gemini-1.5-flash')  # type: ignore
+    stream = client.generate_content(
+        contents=prompt,
+        stream=True,
+        generation_config=types.GenerationConfig(
+            candidate_count=1,
+            stop_sequences=[],
+            max_output_tokens=8192,
+            temperature=1.0,
+            top_p=0.95,
+            top_k=64
+        ),
+    )
+    for chunk in stream:
+        if getattr(chunk, "text", None):
+            yield chunk.text

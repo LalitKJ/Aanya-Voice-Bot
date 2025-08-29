@@ -59,6 +59,7 @@ dependencies = [
     { name = "google-generativeai" },
     { name = "httpx" },
     { name = "logging" },
+    { name = "murf" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "requests" },
@@ -74,6 +75,7 @@ requires-dist = [
     { name = "google-generativeai", specifier = ">=0.8.5" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "logging", specifier = ">=0.4.9.6" },
+    { name = "murf", specifier = ">=2.0.2" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "requests", specifier = ">=2.32.4" },
@@ -370,6 +372,21 @@ name = "logging"
 version = "0.4.9.6"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/93/4b/979db9e44be09f71e85c9c8cfc42f258adfb7d93ce01deed2788b2948919/logging-0.4.9.6.tar.gz", hash = "sha256:26f6b50773f085042d301085bd1bf5d9f3735704db9f37c1ce6d8b85c38f2417", size = 96029, upload-time = "2013-06-04T23:43:22.086Z" }
+
+[[package]]
+name = "murf"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/56/5f237e3940fd8178438d787607446b83d9e56daca093a3f524dbc170c729/murf-2.0.2.tar.gz", hash = "sha256:84a60b3f842be2a642c2c7036ed7a77e8ab5d1fe0839f4a6d0c6312ff52faf3d", size = 40701, upload-time = "2025-07-29T13:00:09.826Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/b1/62d6c370d9d193120a21f962fb42563fb11f7bc629146e7762bb064b1b50/murf-2.0.2-py3-none-any.whl", hash = "sha256:0919e178c65c589b9d91e2aa07e8ea8a45716c4a98b2ad5cc60d3f26f7a52ab4", size = 77332, upload-time = "2025-07-29T13:00:08.309Z" },
+]
 
 [[package]]
 name = "proto-plus"
