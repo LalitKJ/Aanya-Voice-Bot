@@ -1,8 +1,10 @@
 // @ts-nocheck
 
+import type { ChatMessage } from "./home";
+
 // Day 17: Send audio data to the server via WebSocket
 let audioWebSocket;
-function connectAudioWebSocket() {
+function connectAudioWebSocket(callback) {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const wsUrl = `${protocol}://${window.location.host}/api/ws/audio`;
     if (!wsUrl) {
@@ -30,8 +32,13 @@ function connectAudioWebSocket() {
         if (data.type === "error") {
             alert("Transcription error: " + data.message);
         } else if (data.type === "audio") {
-            console.log("Received audio chunk:", data.b64.length);
             playAudioChunk(data.b64);
+        } else if (data.type === "transcript" || data.type === "llm-response") {
+            const msg: ChatMessage = {
+                user: data.user,
+                mesage: data.text
+            }
+            callback(msg);
         }
     };
 
@@ -60,21 +67,21 @@ let inputStream;
 let scriptProcessor;
 let audioSource;
 let isRecording = false;
-export async function startRecording() {
+export async function startRecording(callback) {
     // If already recording, stop recording
     if (isRecording) {
         stopRecording();
         return;
     }
 
-    const recordButton = document.getElementById("record-button");
+    const recordButton = document.getElementById("toggle-live-chat");
 
     recordButton.classList.add("stop-recording");
     recordButton.innerText = "Connecting...";
 
     try {
         isRecording = true;
-        audioWebSocket = connectAudioWebSocket();
+        audioWebSocket = connectAudioWebSocket(callback);
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         inputStream = await navigator.mediaDevices.getUserMedia({ audio: true, channelCount: 1 });
         audioSource = audioContext.createMediaStreamSource(inputStream);
@@ -85,8 +92,6 @@ export async function startRecording() {
             const inputData = e.inputBuffer.getChannelData(0);
             const pcm16 = floatTo16BitPCM(inputData);
             if (audioWebSocket && audioWebSocket.readyState === WebSocket.OPEN) {
-                setTimeout(() => console.clear(), 1000);
-                console.count("Sending audio data to server...", pcm16);
                 audioWebSocket.send(pcm16);
             }
         };
@@ -103,7 +108,7 @@ export async function startRecording() {
 
 export function stopRecording() {
     isRecording = false;
-    const recordButton = document.getElementById("record-button");
+    const recordButton = document.getElementById("toggle-live-chat");
 
     if (scriptProcessor) {
         scriptProcessor.disconnect();

@@ -6,34 +6,17 @@
 
 body {
 	font-family: Arial, sans-serif;
-	// background: #3f5efb;
-	// background: radial-gradient(
-	// 	circle,
-	// 	rgba(63, 94, 251, 1) 0%,
-	// 	rgba(252, 70, 107, 1) 100%
-	// );
 	background: #5a5a5a;
-	color: #333;
-	padding: 30px;
-	min-height: 100dvh;
-	width: 100vw;
-	overflow-x: hidden;
+	color: #fff;
 }
 
-.silkscreen-regular {
-	font-family: "Silkscreen", sans-serif;
-	font-weight: 400;
-	font-style: normal;
-}
+// <weight>: Use a value from 200 to 900
+// <uniquifier>: Use a unique and descriptive class name
 
-.silkscreen-bold {
-	font-family: "Silkscreen", sans-serif;
-	font-weight: 700;
+.font-inconsolata {
+	font-family: "Inconsolata", monospace;
+	font-optical-sizing: auto;
+	// font-weight: 200;
 	font-style: normal;
-}
-
-.caveat-brush-regular {
-	font-family: "Caveat Brush", cursive;
-	font-weight: 400;
-	font-style: normal;
+	font-variation-settings: "wdth" 100;
 }

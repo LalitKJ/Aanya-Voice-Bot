@@ -95,6 +95,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # 4. Websocket endpoint for real-time communication (Day 16)
 async def llm_tts_pipeline(session_id: str, text: str, websocket: WebSocket):
+    await websocket.send_json({"type": "transcript", "user": "user", "text": text})
     tts_queue = asyncio.Queue()
     # Append user message to chat history
     history = chat_history_store.get(session_id, [])
@@ -114,7 +115,7 @@ async def llm_tts_pipeline(session_id: str, text: str, websocket: WebSocket):
                     full_response  += chunk
             # After LLM response complete, store it in chat history
             print("Full LLM response:", full_response)
-            await websocket.send_json({"type": "llm", "text": full_response})
+            await websocket.send_json({"type": "llm-response", "user": "bot", "text": full_response})
             history.append({"role": "Aanya", "content": full_response})
             chat_history_store[session_id] = history
         finally:

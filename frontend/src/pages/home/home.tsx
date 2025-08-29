@@ -1,62 +1,112 @@
 import './home.scss'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { startRecording } from "./home"
 
+export interface ChatMessage {
+    user: string;
+    message: string;
+}
+
+export interface LiveChat {
+    active: boolean;
+    listening: boolean;
+    chatHistory: ChatMessage[];
+}
+
 function Home() {
     const [serverOnline, setServerOnline] = useState<boolean>(false);
-    const { data } = useQuery({
+    const [liveChat, setLiveChat] = useState<LiveChat>({
+        active: false,
+        listening: false,
+        chatHistory: [
+            {
+                user: 'bot',
+                message: 'Hello! How can I help you today?'
+            },
+            {
+                user: 'user',
+                message: 'Hi, I need help with my order.'
+            },
+        ]
+    });
+
+
+    function record() {
+        function updateChats(data: ChatMessage) {
+            console.log("Before", liveChat);
+            const updatedChatHistory = liveChat.chatHistory;
+            console.log("updatedChatHistory", updatedChatHistory);
+            updatedChatHistory.push(data);
+            setLiveChat({
+                ...liveChat,
+                chatHistory: updatedChatHistory
+            });
+            console.log("After", liveChat);
+        }
+        startRecording(updateChats);
+    }
+
+    useQuery({
         queryKey: ['server-connection'],
         queryFn: async () => {
             const res = await fetch('/api/');
-            const json = await res.json();
-            return json;
+            setServerOnline(res.status === 200);
+            return res;
         },
-        refetchInterval: 90000, // Refetch every second
-
+        refetchInterval: 90000,
     });
-    useEffect(() => {
-        const statusElement = document.getElementById('aanya');
-        if (data) {
-            setServerOnline(true);
-            statusElement?.style.setProperty('color', 'green');
-        } else {
-            setServerOnline(false);
-            statusElement?.style.setProperty('color', 'red');
-        }
-    }, [data])
 
     return (
-        <>
+        <div id='voice-bot'>
             <div className="message glass">
-                <h3 className="message silkscreen-bold">Hello from our brand new Ai Agent</h3>
-                <h4 className="name" id='aanya'>~Aanya</h4>
+                <h1 className={serverOnline ? 'connection-success' : 'connection-error'} id='aanya'>Aanya</h1>
+                <button
+                    className='font-inconsolata'
+                    id="toggle-live-chat"
+                    disabled={!serverOnline}
+                    onClick={record}
+                >
+                    {liveChat.active
+                        ? <>
+                            {liveChat.listening ? 'Listening...' : 'Live Chat'}
+                            <div className="wave-line" data-listening={liveChat.listening}></div>
+                        </>
+                        : 'Live Chat'
+                    }
+                </button>
             </div>
-            <div className="content">
-                <div className="voice-transcript glass">
-                    <h1>Echo Bot</h1>
-                    <div className="record-audio">
-                        <audio id="echo-audio" controls></audio>
-                        <div className="controls">
-                            <button
-                                id="record-button"
-                                className="start-recording"
-                                onClick={startRecording}
-                                disabled={!serverOnline}
-                            >Start Recording</button>
-                            <p id="upload-status"></p>
-                        </div>
-                        <div id="error-message" className="error-message" style={{ display: 'none' }}></div>
-                        <audio id="llm-output" controls></audio>
+            <div className="llm-history font-inconsolata" data-server-online={serverOnline}>
+                {/* {liveChat.chatHistory.map((msg, index) => (
+                    <div className={"chat" + (msg.user === 'bot' ? ' bot-chat' : ' user-chat')} key={msg.message}>
+                        <p className="chat">{msg.message}</p>
                     </div>
-                    <div id="chat-history" className="chat-history glass" style={{ marginTop: '1em', maxHeight: '300px', overflowY: 'auto', padding: '1em', borderRadius: '8px', background: '#f8f8ff' }} >
-                        <div id="transcript"></div>
-                    </div>
-                </div>
+                ))} */}
             </div>
-        </>
+        </div>
     )
 }
 
 export default Home
+
+{/* <div className="voice-transcript glass">
+    <h1>Echo Bot</h1>
+    <div className="record-audio">
+        <audio id="echo-audio" controls></audio>
+        <div className="controls">
+            <button
+                id="record-button"
+                className="start-recording"
+                onClick={startRecording}
+                disabled={!serverOnline}
+            >Start Recording</button>
+            <p id="upload-status"></p>
+        </div>
+        <div id="error-message" className="error-message" style={{ display: 'none' }}></div>
+        <audio id="llm-output" controls></audio>
+    </div>
+    <div id="chat-history" className="chat-history glass" style={{ marginTop: '1em', maxHeight: '300px', overflowY: 'auto', padding: '1em', borderRadius: '8px', background: '#f8f8ff' }} >
+        <div id="transcript"></div>
+    </div>
+</div> */}

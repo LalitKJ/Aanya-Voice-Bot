@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 const AUDIO_WS_URL = "ws://localhost:8000/ws/audio";
 
