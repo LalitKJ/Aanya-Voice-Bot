@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app # Mount for development, remove for production
+    environment:
+      # Example: Pass backend address to frontend
+      VITE_APP_BACKEND_ADDRESS: http://localhost:8000 # Adjust for production
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:80" # Map host port 3000 to container port 80 (Nginx default)
+    volumes:
+      - ./frontend:/app # Mount for development, remove for production
+      - /app/node_modules # Exclude node_modules from host mount
+    depends_on:
+      - backend

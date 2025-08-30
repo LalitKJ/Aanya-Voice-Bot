@@ -43,7 +43,7 @@ function Home() {
     useQuery({
         queryKey: ['server-connection'],
         queryFn: async () => {
-            const res = await fetch('/api/');
+            const res = await fetch('/api/check-status');
             setServerOnline(res.status === 200);
             return res;
         },

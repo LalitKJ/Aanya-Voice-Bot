@@ -30,19 +30,15 @@ app = FastAPI()
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# Mount frontend folder (relative to backend directory)
-app.mount("/static", StaticFiles(directory="./frontend"), name="static")
 
 
 # 1. Serve the index.html file (Day 1)
-@app.get("/")
+@app.get("/api/check-status")
 def serve_home():
     return {"message": "Hello from Backend!"}
 
-
-
 # 2. Generate voice from text using Murf API and send audio link (Day 2)
-@app.get("/voices")
+@app.get("/api/voices")
 async def get_voices():
     try:
         res = await tts.list_voices()
@@ -51,28 +47,9 @@ async def get_voices():
         logging.error(f"Error fetching voices: {e}")
         return JSONResponse(content={"error": "Unable to fetch voices."}, status_code=500)
 
-    history: List[Dict] = chat_history_store.get(session_id, [])
-    try:
-        transcript = await stt.speech_to_text(file)
-        history.append({"role": "User", "content": transcript})
-        prompt = "\n".join([
-            ("User: " + msg["content"] if msg["role"] == "User" else "Aanya: " + msg["content"])
-            for msg in history
-        ])
-        prompt += "\nPlease answer the question in a concise manner and less than 2800 characters. Also keep formatting easy, do not answer in points, keep it all in a simple paragraph so that I can convert it into audio using Murf Ai."
-        aiResponse = llm.ask_gemini(prompt)
-        res = aiResponse.text[:2999]
-        history.append({"role": "Aanya", "content": res})
-        chat_history_store[session_id] = history
-        response = await tts.text_to_murf_voice(res)
-        return {"audio": response.json(), "history": history}
-    except Exception as e:
-        logging.error(f"Agent chat error: {e}")
-        return await tts.fallback_audio_response()
-
 
 # 3. Websocket endpoint for real-time communication (Day 15)
-@app.websocket("/ws")
+@app.websocket("/api/ws")
 async def websocket_endpoint(websocket: WebSocket):
     try:
         if websocket is None:
@@ -114,7 +91,6 @@ async def llm_tts_pipeline(session_id: str, text: str, websocket: WebSocket):
                     await tts_queue.put(chunk)
                     full_response  += chunk
             # After LLM response complete, store it in chat history
-            print("Full LLM response:", full_response)
             await websocket.send_json({"type": "llm-response", "user": "bot", "text": full_response})
             history.append({"role": "Aanya", "content": full_response})
             chat_history_store[session_id] = history
@@ -141,7 +117,7 @@ async def llm_tts_pipeline(session_id: str, text: str, websocket: WebSocket):
         asyncio.create_task(tts_worker())
     )
 
-@app.websocket("/ws/audio")
+@app.websocket("/api/ws/audio")
 async def websocket_audio_endpoint(websocket: WebSocket):
     """Handles WebSocket connection for real-time transcription and voice response."""
     await websocket.accept()
@@ -151,7 +127,6 @@ async def websocket_audio_endpoint(websocket: WebSocket):
     session_id = "default_session"
     # Callback function for when final transcription is received
     def on_final_transcript(text: str):
-        print(f"Query: {text}")
         # Use run_coroutine_threadsafe to schedule the coroutine from the callback thread
         asyncio.run_coroutine_threadsafe(
             llm_tts_pipeline(session_id, text, websocket), loop
@@ -169,6 +144,13 @@ async def websocket_audio_endpoint(websocket: WebSocket):
         transcriber.close()
         logging.info("Transcription resources released.")
 
+
+
+
+# Mount the static files directory from the frontend build output.
+# This should be after all API routes to avoid overriding them.
+# `html=True` will serve `index.html` for the root path.
+app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
 
 
 if __name__ == "__main__":
