@@ -44,6 +44,14 @@ div#voice-bot {
 		font-size: 1.2rem;
 		font-weight: 400;
 		overflow-y: scroll;
+		div.no-history {
+			font-size: 3rem;
+			display: flex;
+			font-weight: 600;
+			height: 100%;
+			justify-content: center; /* Horizontal center */
+			align-items: center;
+		}
 		div.chat {
 			width: 70%;
 			margin-bottom: 20px;

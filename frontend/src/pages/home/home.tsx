@@ -21,16 +21,7 @@ function Home() {
     const [liveChat, setLiveChat] = useState<LiveChat>({
         active: false,
         listening: false,
-        chatHistory: [
-            {
-                user: 'bot',
-                message: 'Hello! How can I help you today?'
-            },
-            {
-                user: 'user',
-                message: 'Hi, I need help with my order.'
-            },
-        ]
+        chatHistory: []
     });
 
 
@@ -79,11 +70,14 @@ function Home() {
                 </button>
             </div>
             <div className="llm-history font-inconsolata" data-server-online={serverOnline}>
-                {/* {liveChat.chatHistory.map((msg, index) => (
-                    <div className={"chat" + (msg.user === 'bot' ? ' bot-chat' : ' user-chat')} key={msg.message}>
-                        <p className="chat">{msg.message}</p>
-                    </div>
-                ))} */}
+                {liveChat.chatHistory.length === 0
+                    ? <div className="no-history">Start New Chat</div>
+                    : liveChat.chatHistory.map((msg, index) => (
+                        <div className={"chat" + (msg.user === 'bot' ? ' bot-chat' : ' user-chat')} key={msg.message}>
+                            <p className="chat">{msg.message}</p>
+                        </div>
+                    ))
+                }
             </div>
         </div>
     )

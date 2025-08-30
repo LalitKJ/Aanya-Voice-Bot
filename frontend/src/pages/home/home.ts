@@ -36,7 +36,7 @@ function connectAudioWebSocket(callback) {
         } else if (data.type === "transcript" || data.type === "llm-response") {
             const msg: ChatMessage = {
                 user: data.user,
-                mesage: data.text
+                message: data.text
             }
             callback(msg);
         }
